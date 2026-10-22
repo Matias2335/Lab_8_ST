@@ -197,3 +197,141 @@ pytest -q -k todos --cov=embarque --cov-branch --cov-report=term-missing
 
 
 Os dois testes dão **100% de ramos**: todos V percorre o ramo V do `if` e todos F percorre o ramo F. Ou seja, uma suíte com 100% de ramos passa sem ver o defeito, porque C1 só exige que a decisão assuma V e F, e não que cada condição mostre seu efeito.
+
+## Exercício 2 - d) Conjuntos MC/DC e correção
+
+**Defeito:** em Python `and` tem precedência sobre `or`, então o código avalia `(cartao and documento and grupo_chamado) or prioridade`, enquanto a especificação pede `cartao and documento and (grupo_chamado or prioridade)`. As duas divergem quando `prioridade` é V e `cartao` ou `documento` é F (linhas 5, 7, 9, 11, 13 e 15 da tabela): o código deixa embarcar sem cartão ou sem documento.
+
+| Conjunto | Linhas | Linha divergente | Acha o defeito? |
+|---|---|---|---|
+| M1 | 2, 3, 4, 6, 10 | nenhuma | não |
+| M2 | 2, 3, 4, 7, 10 | 7 | sim |
+| M3 | 2, 3, 4, 6, 11 | 11 | sim |
+| M4 | 2, 3, 4, 7, 11 | 7 e 11 | sim |
+
+**Explicação:** M1 usa as linhas 6 e 10 para os pares de documento e cartao, e nelas `prioridade` é F, então o `or prioridade` não atua e as funções coincidem. M2, M3 e M4 incluem a linha 7 (VFFV) ou a 11 (FVFV), com `prioridade` V e uma condição obrigatória F, onde a precedência faz diferença. Conjuntos MC/DC mínimos diferentes acham defeitos diferentes.
+
+**MCC:** executa as 16 combinações, incluindo as linhas divergentes, então sempre acharia o defeito (16 casos contra 5).
+
+**Correção:**
+
+```python
+def pode_embarcar(cartao, documento, grupo_chamado, prioridade):
+    if cartao and documento and (grupo_chamado or prioridade):
+        return True
+    return False
+```
+
+Após a correção, `pode_embarcar` e `regra` concordam nas 16 linhas, e todos os testes passam.
+
+<img width="887" height="227" alt="image" src="https://github.com/user-attachments/assets/7975c3c2-c569-4fa9-99b0-ba69ba0319e2" />
+
+## Exercício 3 - a) Definições, usos e pares du
+
+| Variável | Linha | Tipo |
+|---|---|---|
+| `total` | 2 | def |
+| `total` | 5 | c-use e def |
+| `total` | 6 | p-use |
+| `total` | 7 | def |
+| `total` | 8 | c-use |
+| `desconto` | 4 | def |
+| `desconto` | 5 | c-use |
+
+Na linha 5, o uso de `total` precede a nova definição, então a definição da linha 5 não alcança o uso da própria linha 5. A linha 7 só define `total`, portanto não há par (2, 7).
+
+**Pares du de `total`** (o p-use da linha 6 gera um par por ramo):
+
+| Par | Tipo | Caminho exigido | Exemplo |
+|---|---|---|---|
+| (2, 5) | c-use | VIP | `(60, True)` |
+| (2, 6, V) | p-use | sem VIP, preço abaixo de 50 | `(30, False)` |
+| (2, 6, F) | p-use | sem VIP, preço a partir de 50 | `(200, False)` |
+| (2, 8) | c-use | sem VIP, preço a partir de 50 | `(200, False)` |
+| (5, 6, V) | p-use | VIP, total com desconto abaixo de 50 | `(60, True)` |
+| (5, 6, F) | p-use | VIP, total com desconto a partir de 50 | `(200, True)` |
+| (5, 8) | c-use | VIP, total com desconto a partir de 50 | `(200, True)` |
+| (7, 8) | c-use | passa pelo mínimo de R$50 | `(30, False)` |
+
+**Pares du de `desconto`:**
+
+| Par | Tipo | Caminho exigido | Exemplo |
+|---|---|---|---|
+| (4, 5) | c-use | VIP | `(60, True)` |
+
+Total: 9 pares du (8 de `total` e 1 de `desconto`).
+
+## Exercício 3 - b) Pares não percorridos pela suíte atual
+
+A suíte atual, `preco_final(60, True) == 50` e `preco_final(200, False) == 200`, tem 100% de ramos.
+
+**Teste `(60, True)`:** `total = 60` (linha 2), `desconto = 12` (linha 4), `total = 36` (linha 5), `36 < 50` é V, `total = 50` (linha 7), `return 50`. Percorre (2,5), (4,5), (5,6,V) e (7,8).
+
+**Teste `(200, False)`:** `total = 200` (linha 2), pula o `if vip`, `200 < 50` é F, `return 200`. Percorre (2,6,F) e (2,8).
+
+| Par | Tipo | Percorrido? |
+|---|---|---|
+| (2, 5) | c-use | sim |
+| (2, 6, V) | p-use | **não** |
+| (2, 6, F) | p-use | sim |
+| (2, 8) | c-use | sim |
+| (5, 6, V) | p-use | sim |
+| (5, 6, F) | p-use | **não** |
+| (5, 8) | c-use | **não** |
+| (7, 8) | c-use | sim |
+| (4, 5) | c-use | sim |
+
+**Não percorridos (3 de 9):**
+
+- **(2, 6, V):** sem VIP e preço abaixo de 50.
+- **(5, 6, F) e (5, 8):** VIP com total com desconto a partir de 50. Nenhum teste leva o valor com desconto ao `return` sem passar pelo mínimo.
+
+A suíte cobre todos os ramos, mas não todos os pares du.
+
+## Exercício 3 - c) All-Uses, defeito e por que a suíte não o viu
+
+**O que falta (da especificação):** VIP tem 20% de desconto e todo pedido custa no mínimo R$50.
+
+| Teste | Esperado | Pares que cobre |
+|---|---|---|
+| `(30, False)` | 50 | (2, 6, V) |
+| `(200, True)` | 160 | (5, 6, F) e (5, 8) |
+
+Com `(60, True)` e `(200, False)`, esses 4 testes cobrem os 9 pares du (All-Uses).
+
+**O que acontece:** a linha 5, `total = total * 0.8 - desconto`, aplica o desconto duas vezes: `total * 0.8` já desconta 20%, e `desconto = preco * 0.2` desconta outros 20%. O VIP paga 60% do preço. `(200, True)` devolve 120 e a especificação pede 160, então o teste falha.
+
+**Por que a suíte atual não viu:** o único teste VIP, `(60, True)`, dá 36 pelo código e 48 pela especificação. Os dois são menores que 50 e o `if total < 50` os substitui por 50, escondendo o erro. Nenhum teste levava o valor com desconto da linha 5 direto ao `return` da linha 8, o par (5, 8). A suíte tinha 100% de ramos, mas esse par du ficava de fora.
+
+Resultado antes da correção:
+
+<img width="992" height="370" alt="image" src="https://github.com/user-attachments/assets/a73850b7-9006-4408-a001-97e8ddce1c8e" />
+
+## Exercício 3 - d) Correção e suíte completa
+
+**Correção:** a linha 5 subtraía o `desconto` depois de já multiplicar por 0,8, aplicando o desconto de 20% duas vezes. A correção retira o `* 0.8` e mantém a subtração do desconto:
+
+```python
+def preco_final(preco, vip):
+    total = preco
+    if vip:
+        desconto = preco * 0.2
+        total = total - desconto
+    if total < 50:
+        total = 50
+    return total
+```
+
+A estrutura de definições e usos é a mesma dos itens (a) e (b), então os 9 pares du seguem válidos.
+
+Com a função corrigida, `(200, True)` devolve 160, como a especificação pede, e os 4 testes de `test_preco.py` passam.
+
+Suíte inteira:
+
+(colar aqui a captura de `pytest -q` com tudo passando)
+
+Cobertura:
+
+<img width="863" height="372" alt="image" src="https://github.com/user-attachments/assets/cfc00512-ccb6-4081-bf2d-176a6d2cb40b" />
+
+
