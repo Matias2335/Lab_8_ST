@@ -83,3 +83,31 @@ P2 e P6 percorrem as mesmas arestas e diferem só no número de voltas do ciclo 
 O caminho **2→4→5→10→…** (zero voltas do `for`, aresta 5→10 logo depois do 4→5) é **inviável**. Para passar do `if` da linha 2, a senha precisa ter pelo menos 8 caracteres, então o `for` dá no mínimo 8 voltas e nunca vai direto de 5 para 10 na primeira vez. É por isso que, ao inverter o nó 5 a partir da referência, o caminho resultante não é executável e foi substituído por P6 (9 voltas).
 
 Por consequência, qualquer caminho com menos de 8 voltas depois do nó 4 também é inviável. Entre os viáveis, P2 e P6 são o mínimo (8 voltas) e o mínimo mais um.
+
+
+## Exercício 1 - c) Teste parametrizado e cobertura
+
+Os 6 caminhos da base são viáveis e foram implementados em `test_base_de_caminhos` com `@pytest.mark.parametrize`.
+
+Medição:
+
+```
+pytest -q --cov=senha --cov-branch --cov-report=term-missing
+```
+
+<img width="927" height="218" alt="image" src="https://github.com/user-attachments/assets/b303d08b-576a-4b48-8789-acdbb4ee7050" />
+
+<img width="941" height="255" alt="image" src="https://github.com/user-attachments/assets/3661fff9-7109-4241-8a3f-d01624584073" />
+
+### Quantos testes dão 100% de ramos?
+
+| Conjunto | Nº de testes | Ramos |
+|---|---|---|
+| Base de caminhos | 6 = V(G) | 100% |
+| Conjunto mínimo para C1 | 3 | 100% |
+
+O conjunto mínimo é `"abc"` (ramo V da linha 2), `"ab1!!cde"` (dígito, símbolo e letra no laço, 5 pontos, ramo V da linha 10) e `"abcdefgh"` (ramo F da linha 10).
+
+Dois testes não bastam: o ramo V da linha 2 só se alcança com senha curta, que termina em `"fraca"` e não executa o resto da função. Os ramos V e F da linha 10 exigem então dois outros testes, o que dá no mínimo 3.
+
+**Conclusão:** C1 pede 3 testes e a base pede V(G) = 6, coerente com a relação testes de C0 ≤ testes de C1 ≤ V(G) da aula. A base cobre todos os ramos, mas um conjunto menor já basta para C1. Os testes a mais da base exercitam caminhos que C1 não exige: por exemplo, o P3 e o P4 isolam o dígito e o símbolo em senhas que terminam em "media", e o P6 acrescenta uma volta ao laço (9 contra 8).
