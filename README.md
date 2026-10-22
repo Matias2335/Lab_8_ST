@@ -111,3 +111,89 @@ O conjunto mínimo é `"abc"` (ramo V da linha 2), `"ab1!!cde"` (dígito, símbo
 Dois testes não bastam: o ramo V da linha 2 só se alcança com senha curta, que termina em `"fraca"` e não executa o resto da função. Os ramos V e F da linha 10 exigem então dois outros testes, o que dá no mínimo 3.
 
 **Conclusão:** C1 pede 3 testes e a base pede V(G) = 6, coerente com a relação testes de C0 ≤ testes de C1 ≤ V(G) da aula. A base cobre todos os ramos, mas um conjunto menor já basta para C1. Os testes a mais da base exercitam caminhos que C1 não exige: por exemplo, o P3 e o P4 isolam o dígito e o símbolo em senhas que terminam em "media", e o P6 acrescenta uma volta ao laço (9 contra 8).
+
+## Exercício 1 - d) Teste de laços
+
+O `if len(senha) < 8` da linha 2 retorna antes do `for`, então o laço só executa com senhas de 8 ou mais caracteres. O laço tem **mínimo de 8 voltas** e nenhum máximo.
+
+| Caso | Voltas | Viável? | Entrada |
+|---|---|---|---|
+| Zero voltas | 0 | Não | `""` retorna `"fraca"` na linha 3 |
+| Uma e duas voltas | 1, 2 | Não | senha curta, retorna na linha 3 |
+| Mínimo − 1 | 7 | Não | `"abcdefg"` retorna `"fraca"` |
+| Mínimo | 8 | Sim | `"abcdefgh"` (P2 da base) |
+| Mínimo + 1 | 9 | Sim | `"abcdefghi"` (P6 da base) |
+| Típico | 20 | Sim | `"ab1!" * 5` |
+| Muitas voltas | 1000 | Sim | `"a" * 1000` |
+| n − 1, n, n + 1 | - | Não se aplica | não existe número máximo de voltas |
+
+Os casos inviáveis continuam no teste (`""` e `"abcdefg"`) porque confirmam a fronteira do `if` da linha 2: eles mostram que o laço não é alcançado, e não que ele dá poucas voltas.
+
+Casos acrescentados:
+- **Típico e muitas voltas:** 20 e 1000 voltas, para o laço acumular pontos em várias voltas.
+- **Primeira e última volta:** `"1abcd111"` e `"111abcd1"` somam 4 pontos apenas se o primeiro (ou o último) caractere for lido. Detectam defeitos de limite como `for c in senha[1:]` ou `for c in senha[:-1]`.
+- **Fronteira do `pontos >= 4`:** `"!1abcdef"` (3 pontos, `"media"`) e `"!!abcdef"` (4 pontos, `"forte"`).
+
+Resultado:
+
+<img width="927" height="352" alt="image" src="https://github.com/user-attachments/assets/dcb15cc6-4160-4026-a444-2d20109ef745" />
+
+
+Todos os testes passam. A cobertura de ramos já era 100% antes desses casos: eles não aumentam a cobertura, aumentam a chance de achar defeitos nas voltas do laço.
+
+## Exercício 2 - a) `mcdc.py`
+
+Implementadas em `mcdc.py`:
+
+- `regra(cartao, documento, grupo_chamado, prioridade)`: escrita direto da especificação, `cartao and documento and (grupo_chamado or prioridade)`.
+- `pares_independentes(decisao, n)`: para cada condição, devolve os pares de linhas da tabela-verdade (numeradas de 1, com V antes de F) que diferem só nela e mudam a decisão.
+
+Saída de `python mcdc.py`:
+
+<img width="796" height="161" alt="image" src="https://github.com/user-attachments/assets/00f129b0-69ad-40f9-ae39-f947675416ac" />
+
+## Exercício 2 - b) Pares e conjuntos MC/DC mínimos
+
+A decisão só é V nas linhas 1 (VVVV), 2 (VVVF) e 3 (VVFV), e F nas demais.
+
+| Condição | Pares | Quantidade |
+|---|---|---|
+| cartao | (1,9), (2,10), (3,11) | 3 |
+| documento | (1,5), (2,6), (3,7) | 3 |
+| grupo_chamado | (2,4) | 1 |
+| prioridade | (3,4) | 1 |
+
+**Conjuntos mínimos:** grupo_chamado e prioridade têm um único par cada, (2,4) e (3,4), então as linhas 2, 3 e 4 entram sempre. Para cartao, os pares (2,10) e (3,11) reaproveitam a linha 2 ou a 3 e acrescentam só uma linha nova (10 ou 11). Para documento, vale o mesmo com (2,6) e (3,7), que acrescentam 6 ou 7. As linhas F de cartao (9, 10, 11) e de documento (5, 6, 7) nunca coincidem, então nenhuma linha atende às duas condições ao mesmo tempo.
+
+O mínimo é **5 casos** (n + 1) e existem **4 conjuntos mínimos**, 2 escolhas para cartao vezes 2 para documento:
+
+| Conjunto | Linhas |
+|---|---|
+| M1 | 2, 3, 4, 6, 10 |
+| M2 | 2, 3, 4, 7, 10 |
+| M3 | 2, 3, 4, 6, 11 |
+| M4 | 2, 3, 4, 7, 11 |
+
+O MCC exigiria 2⁴ = 16 casos.
+
+## Exercício 2 - c) Todos V e todos F
+
+Comparação de `pode_embarcar` com `regra` em dois testes:
+
+| Teste | Entrada | `regra` | `pode_embarcar` |
+|---|---|---|---|
+| Todos V | (V, V, V, V) | True | True |
+| Todos F | (F, F, F, F) | False | False |
+
+As duas funções concordam nos dois testes: o defeito **não é detectado**. Em todos V, `cartao and documento and grupo_chamado` já é V; em todos F, as duas partes do `or` são F. A divergência só aparece quando `prioridade` é V e alguma das outras condições é F.
+
+Medição de ramos:
+
+```
+pytest -q -k todos --cov=embarque --cov-branch --cov-report=term-missing
+```
+
+<img width="1026" height="300" alt="image" src="https://github.com/user-attachments/assets/c6730d86-3084-4376-9ff5-0c96ca5a7695" />
+
+
+Os dois testes dão **100% de ramos**: todos V percorre o ramo V do `if` e todos F percorre o ramo F. Ou seja, uma suíte com 100% de ramos passa sem ver o defeito, porque C1 só exige que a decisão assuma V e F, e não que cada condição mostre seu efeito.
